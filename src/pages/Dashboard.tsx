@@ -23,6 +23,7 @@ const Dashboard = () => {
     angle: "",
     mood: "",
   });
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -68,6 +69,42 @@ const Dashboard = () => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate("/");
+  };
+
+  const handleGenerate = async () => {
+    if (!uploadedImage || !user) {
+      toast.error("Please upload an image first");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-product-image', {
+        body: {
+          originalImageUrl: uploadedImage,
+          filters,
+          userId: user.id,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      toast.success("Image generated successfully!");
+      setCredits(data.remainingCredits);
+      
+      // Refresh the gallery to show the new image
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Generation error:", error);
+      toast.error("Failed to generate image. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (!user) {
@@ -119,11 +156,11 @@ const Dashboard = () => {
             <Button
               className="w-full bg-gradient-primary hover:opacity-90 transition-opacity shadow-elegant"
               size="lg"
-              disabled={!uploadedImage || credits <= 0}
-              onClick={() => toast.info("Image generation will be implemented next!")}
+              disabled={!uploadedImage || credits <= 0 || isGenerating}
+              onClick={handleGenerate}
             >
               <Zap className="w-5 h-5 mr-2" />
-              Generate Image {credits <= 0 && "(No Credits)"}
+              {isGenerating ? "Generating..." : `Generate Image ${credits <= 0 ? "(No Credits)" : ""}`}
             </Button>
           </div>
 

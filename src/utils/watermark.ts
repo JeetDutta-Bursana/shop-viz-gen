@@ -1,4 +1,30 @@
 /**
+ * Get proxied image URL to bypass CORS
+ */
+async function getProxiedImageUrl(imageUrl: string): Promise<string> {
+  // Check if we need to use proxy (external URLs that might have CORS issues)
+  if (imageUrl.startsWith('data:') || imageUrl.startsWith('/')) {
+    return imageUrl; // Local or data URLs don't need proxy
+  }
+
+  try {
+    // Get Supabase URL from environment
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (!supabaseUrl) {
+      console.warn('VITE_SUPABASE_URL not found, using original URL');
+      return imageUrl;
+    }
+
+    // Use proxy Edge Function
+    const proxyUrl = `${supabaseUrl}/functions/v1/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+    return proxyUrl;
+  } catch (error) {
+    console.warn('Failed to create proxy URL, using original:', error);
+    return imageUrl;
+  }
+}
+
+/**
  * Utility function to add BURSANA logo watermark to an image
  * Returns a data URL of the watermarked image
  */
@@ -6,7 +32,7 @@ export async function addWatermarkToImage(
   imageUrl: string,
   logoUrl: string = '/bursana-logo.svg'
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
@@ -15,8 +41,22 @@ export async function addWatermarkToImage(
       return;
     }
 
+    // Try to get proxied URL if needed
+    let finalImageUrl = imageUrl;
+    try {
+      finalImageUrl = await getProxiedImageUrl(imageUrl);
+    } catch (error) {
+      console.warn('Failed to get proxy URL, using original:', error);
+    }
+
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // Try to set crossOrigin, but handle CORS errors gracefully
+    try {
+      img.crossOrigin = 'anonymous';
+    } catch (e) {
+      // Some browsers may not support this
+      console.warn('Could not set crossOrigin:', e);
+    }
     
     img.onload = () => {
       // Set canvas size to image size
@@ -28,7 +68,11 @@ export async function addWatermarkToImage(
       
       // Load and draw the logo watermark
       const logo = new Image();
-      logo.crossOrigin = 'anonymous';
+      try {
+        logo.crossOrigin = 'anonymous';
+      } catch (e) {
+        console.warn('Could not set crossOrigin for logo:', e);
+      }
       
       logo.onload = () => {
         // Calculate watermark size (15% of image width, maintain aspect ratio)
@@ -70,11 +114,29 @@ export async function addWatermarkToImage(
       logo.src = logoUrl;
     };
     
-    img.onerror = () => {
-      reject(new Error('Failed to load image'));
+    img.onerror = async (error) => {
+      // If CORS blocks the image, try using proxy
+      console.warn('Failed to load image directly, trying proxy:', error);
+      
+      // If we haven't tried proxy yet, try it
+      if (finalImageUrl === imageUrl) {
+        try {
+          const proxiedUrl = await getProxiedImageUrl(imageUrl);
+          if (proxiedUrl !== imageUrl) {
+            // Try loading with proxy
+            img.src = proxiedUrl;
+            return;
+          }
+        } catch (proxyError) {
+          console.error('Proxy also failed:', proxyError);
+        }
+      }
+      
+      reject(new Error('Failed to load image. This may be due to CORS restrictions.'));
     };
     
-    img.src = imageUrl;
+    // Handle CORS errors by trying without crossOrigin if needed
+    img.src = finalImageUrl;
   });
 }
 
@@ -91,21 +153,81 @@ export async function downloadImageWithWatermark(
     
     // If this is a free credit image, add watermark before downloading
     if (isFreeCredit) {
-      const watermarkedDataUrl = await addWatermarkToImage(imageUrl);
-      finalImageUrl = watermarkedDataUrl;
+      try {
+        const watermarkedDataUrl = await addWatermarkToImage(imageUrl);
+        finalImageUrl = watermarkedDataUrl;
+      } catch (watermarkError) {
+        // If watermarking fails (CORS issue), try to download directly
+        console.warn('Watermarking failed, downloading original image:', watermarkError);
+        // Fall through to download original image
+      }
     }
     
-    // Create download link
-    const response = await fetch(finalImageUrl);
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    // If it's already a data URL, use it directly
+    if (finalImageUrl.startsWith('data:')) {
+      const a = document.createElement('a');
+      a.href = finalImageUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+    
+    // For regular URLs, try to fetch (may fail due to CORS)
+    try {
+      // Try direct fetch first
+      let response = await fetch(finalImageUrl);
+      
+      // If direct fetch fails, try proxy
+      if (!response.ok) {
+        const proxiedUrl = await getProxiedImageUrl(finalImageUrl);
+        if (proxiedUrl !== finalImageUrl) {
+          response = await fetch(proxiedUrl);
+        }
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (fetchError) {
+      // If fetch fails, try proxy
+      try {
+        const proxiedUrl = await getProxiedImageUrl(finalImageUrl);
+        if (proxiedUrl !== finalImageUrl) {
+          const response = await fetch(proxiedUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            return;
+          }
+        }
+      } catch (proxyError) {
+        console.warn('Proxy also failed:', proxyError);
+      }
+      
+      // If all else fails, open image in new tab for user to save manually
+      console.warn('Direct download failed (CORS), opening in new tab:', fetchError);
+      window.open(finalImageUrl, '_blank');
+      throw new Error('CORS blocked direct download. Image opened in new tab - please right-click and save.');
+    }
   } catch (error) {
     console.error('Error downloading image:', error);
     throw error;

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Trash2, Images } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Download, Trash2, Images, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { downloadImageWithWatermark } from "@/utils/watermark";
 
 interface Generation {
   id: string;
@@ -11,21 +12,21 @@ interface Generation {
   generated_image_url: string | null;
   status: string;
   created_at: string;
+  is_free_credit?: boolean;
 }
 
 interface ImageGalleryProps {
   userId: string;
+  onRefresh?: () => void;
+  refreshTrigger?: number;
 }
 
-const ImageGallery = ({ userId }: ImageGalleryProps) => {
+const ImageGallery = ({ userId, refreshTrigger }: ImageGalleryProps) => {
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(true);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    fetchGenerations();
-  }, [userId]);
-
-  const fetchGenerations = async () => {
+  const fetchGenerations = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("generations")
@@ -39,21 +40,41 @@ const ImageGallery = ({ userId }: ImageGalleryProps) => {
       setGenerations(data || []);
     }
     setLoading(false);
-  };
+  }, [userId]);
 
-  const handleDownload = async (imageUrl: string) => {
+  useEffect(() => {
+    fetchGenerations();
+  }, [fetchGenerations, refreshTrigger]);
+
+  // Poll for pending generations every 5 seconds
+  useEffect(() => {
+    const hasPendingGenerations = generations.some(gen => gen.status === "pending");
+    
+    if (hasPendingGenerations) {
+      pollingIntervalRef.current = setInterval(() => {
+        fetchGenerations();
+      }, 5000); // Poll every 5 seconds
+    } else {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [generations, fetchGenerations]);
+
+  const handleDownload = async (imageUrl: string, isFreeCredit: boolean = false) => {
     try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `ai-product-${Date.now()}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      toast.success("Image downloaded!");
+      await downloadImageWithWatermark(
+        imageUrl,
+        isFreeCredit,
+        `ai-product-${Date.now()}.jpg`
+      );
     } catch (error) {
       toast.error("Download failed");
     }
@@ -71,59 +92,92 @@ const ImageGallery = ({ userId }: ImageGalleryProps) => {
   };
 
   return (
-    <Card className="shadow-card">
-      <CardContent className="p-6">
+    <div>
         <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <Images className="w-5 h-5 mr-2 text-primary" />
+          <Images className="w-5 h-5 mr-2 text-purple-600" />
           Your Gallery
         </h3>
 
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          <div className="text-center py-8 flex flex-col items-center">
+            <Loader2 className="w-8 h-8 animate-spin mb-2 text-purple-600" />
+            <p className="text-gray-600">Loading gallery...</p>
+          </div>
         ) : generations.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Images className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No images generated yet</p>
-            <p className="text-sm">Upload a product image to get started!</p>
+          <div className="text-center py-8">
+            <Images className="w-12 h-12 mx-auto mb-4 opacity-50 text-gray-400" />
+            <p className="text-gray-600">No images generated yet</p>
+            <p className="text-sm text-gray-500">Upload a product image to get started!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto">
-            {generations.map((gen) => (
-              <div key={gen.id} className="relative group">
-                <img
-                  src={gen.generated_image_url || gen.original_image_url}
-                  alt="Generated product"
-                  className="w-full h-48 object-cover rounded-lg"
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center space-x-2">
-                  {gen.generated_image_url && (
+            {generations.map((gen) => {
+              const isFreeCredit = gen.is_free_credit === true;
+              return (
+                <Card key={gen.id} className="relative group overflow-hidden">
+                  <div className="relative">
+                    <img
+                      src={gen.generated_image_url || gen.original_image_url}
+                      alt="Generated product"
+                      className="w-full h-48 object-cover"
+                    />
+                    {/* Watermark overlay for free credit images */}
+                    {isFreeCredit && gen.generated_image_url && (
+                      <div className="absolute bottom-2 right-2 pointer-events-none z-10">
+                        <div className="bg-white/90 px-2 py-1 rounded-lg shadow-md">
+                          <img
+                            src="/bursana-logo.svg"
+                            alt="BURSANA"
+                            className="h-6 w-auto opacity-90"
+                            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                    {gen.generated_image_url && (
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        onClick={() => handleDownload(gen.generated_image_url!, isFreeCredit)}
+                        title={isFreeCredit ? "Download with watermark" : "Download"}
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button
                       size="icon"
-                      variant="secondary"
-                      onClick={() => handleDownload(gen.generated_image_url!)}
+                      variant="destructive"
+                      onClick={() => handleDelete(gen.id)}
                     >
-                      <Download className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
-                  )}
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    onClick={() => handleDelete(gen.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-                {gen.status === "pending" && (
-                  <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded text-xs">
-                    Processing...
                   </div>
-                )}
-              </div>
-            ))}
+                  {gen.status === "pending" && (
+                    <div className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center">
+                      <div className="bg-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                        <span className="text-sm font-medium text-gray-900">Processing...</span>
+                      </div>
+                    </div>
+                  )}
+                  {!gen.generated_image_url && gen.status !== "pending" && (
+                    <div className="absolute top-2 right-2 bg-gray-100 px-2 py-1 rounded text-xs">
+                      <span className="text-xs font-medium text-gray-700">Original</span>
+                    </div>
+                  )}
+                  {isFreeCredit && gen.generated_image_url && (
+                    <div className="absolute top-2 left-2 bg-orange-100 px-2 py-1 rounded text-xs font-medium">
+                      <span className="text-xs font-medium text-orange-700">Watermarked</span>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 };
 

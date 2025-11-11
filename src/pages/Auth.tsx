@@ -19,6 +19,7 @@ const Auth = () => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        // Redirect to dashboard which will then redirect to app
         navigate("/dashboard");
       }
     });
@@ -43,7 +44,7 @@ const Auth = () => {
         }
 
         const redirectUrl = `${window.location.origin}/dashboard`;
-        const { error } = await supabase.auth.signUp({
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -53,16 +54,32 @@ const Auth = () => {
 
         if (error) {
           if (error.message.includes("already registered")) {
-            toast.error("Email already registered. Please sign in instead.");
+            // Email already exists - check if it's an admin account
+            toast.info("Email already registered. Attempting to sign in...");
+            
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+
+            if (signInError) {
+              toast.error("Password incorrect. Please use the correct password or sign in instead.");
+            } else {
+              toast.success("Welcome back!");
+              navigate("/dashboard");
+            }
           } else {
             toast.error(error.message);
           }
         } else {
-          toast.success("Account created! Redirecting to dashboard...");
-          navigate("/dashboard");
+          // New account created
+          if (signUpData.user) {
+            toast.success("Account created successfully! You have 5 free credits to get started.");
+            navigate("/dashboard");
+          }
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
@@ -83,6 +100,15 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-subtle p-4">
+      <div className="absolute top-4 left-4">
+        <Button
+          variant="ghost"
+          onClick={() => navigate("/")}
+          className="text-sm"
+        >
+          ← Back to Home
+        </Button>
+      </div>
       <Card className="w-full max-w-md shadow-card">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
@@ -90,10 +116,10 @@ const Auth = () => {
               <Sparkles className="w-8 h-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">
+          <CardTitle className="text-xl sm:text-2xl font-bold">
             {isSignUp ? "Create an account" : "Welcome back"}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm sm:text-base">
             {isSignUp
               ? "Sign up to start generating amazing product images"
               : "Sign in to continue creating stunning visuals"}
@@ -110,6 +136,7 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="text-sm sm:text-base"
               />
             </div>
             <div className="space-y-2">
@@ -121,6 +148,7 @@ const Auth = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="text-sm sm:text-base"
               />
             </div>
             {isSignUp && (
@@ -133,27 +161,46 @@ const Auth = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
+                  className="text-sm sm:text-base"
                 />
               </div>
             )}
             <Button
               type="submit"
-              className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
+              className="w-full bg-gradient-primary hover:opacity-90 transition-opacity text-sm sm:text-base py-2.5 sm:py-3"
               disabled={loading}
             >
               {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            <button
+          <div className="mt-4 space-y-3">
+            <div className="text-center text-sm">
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-primary hover:underline"
+              >
+                {isSignUp
+                  ? "Already have an account? Sign in"
+                  : "Don't have an account? Sign up"}
+              </button>
+            </div>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or</span>
+              </div>
+            </div>
+            <Button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-primary hover:underline"
+              variant="outline"
+              className="w-full text-sm sm:text-base py-2.5 sm:py-3"
+              onClick={() => navigate("/dashboard")}
             >
-              {isSignUp
-                ? "Already have an account? Sign in"
-                : "Don't have an account? Sign up"}
-            </button>
+              Continue to Dashboard
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -1,0 +1,131 @@
+================================================================================
+                    ALL API KEYS & CONNECTIONS SUMMARY
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. FRONTEND ENVIRONMENT VARIABLES (.env file)                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+File: .env (create in root directory)
+
+✓ VITE_SUPABASE_URL=https://your-project-id.supabase.co
+✓ VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key-here
+
+Source: Supabase Dashboard → Settings → API
+  → Project URL
+  → anon/public key
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. SUPABASE EDGE FUNCTION SECRETS (7 required)                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Set in: Supabase Dashboard → Edge Functions → Secrets
+
+✓ SUPABASE_URL=https://your-project-id.supabase.co
+  → Source: Settings → API → Project URL
+
+✓ SUPABASE_ANON_KEY=your-anon-key
+  → Source: Settings → API → anon/public key
+
+✓ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+  → Source: Settings → API → service_role key
+  → ⚠️ KEEP SECRET! Never expose to frontend!
+
+✓ RAZORPAY_KEY_ID=rzp_test_your_key_id
+  → Source: Razorpay Dashboard → Settings → API Keys → Key ID
+
+✓ RAZORPAY_KEY_SECRET=your_razorpay_secret
+  → Source: Razorpay Dashboard → Settings → API Keys → Key Secret
+
+✓ RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
+  → Source: Razorpay Dashboard → Settings → Webhooks → Webhook Secret
+
+✓ LOVABLE_API_KEY=your_lovable_key
+  → Source: Lovable Dashboard → Project Settings → API Keys
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. RAZORPAY PRICING (Already Configured)                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+✅ Already configured in code (₹10, ₹79, ₹499)
+- Single Image: ₹10 (1 credit)
+- 10-Pack: ₹79 (10 credits)
+- Pro Plan: ₹499/mo (unlimited)
+
+No Price IDs needed - prices are set directly in src/pages/Pricing.tsx
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. RAZORPAY WEBHOOK CONFIGURATION                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Endpoint URL: https://YOUR_PROJECT_ID.supabase.co/functions/v1/razorpay-webhook
+Event: payment.captured
+
+Setup:
+  1. Razorpay Dashboard → Settings → Webhooks → Create Webhook
+  2. Enter URL above
+  3. Select event: payment.captured
+  4. Copy Webhook Secret → Add to Supabase secrets
+
+
+================================================================================
+                            QUICK SETUP STEPS
+================================================================================
+
+1. Create .env file:
+   cp env.template .env
+   # Edit with your Supabase credentials
+
+2. Set Supabase secrets (CLI):
+   supabase secrets set SUPABASE_URL=...
+   supabase secrets set SUPABASE_ANON_KEY=...
+   supabase secrets set SUPABASE_SERVICE_ROLE_KEY=...
+   supabase secrets set RAZORPAY_KEY_ID=...
+   supabase secrets set RAZORPAY_KEY_SECRET=...
+   supabase secrets set RAZORPAY_WEBHOOK_SECRET=...
+   supabase secrets set LOVABLE_API_KEY=...
+
+3. Razorpay Pricing:
+   ✅ Already configured in code (₹10, ₹79, ₹499)
+   - No Price IDs needed
+
+4. Set up Razorpay webhook:
+   - Create webhook in Razorpay Dashboard
+   - Copy webhook secret
+   - Add to Supabase secrets
+
+5. Deploy Edge Functions:
+   supabase functions deploy generate-product-image
+   supabase functions deploy create-payment
+   supabase functions deploy razorpay-webhook
+
+
+================================================================================
+                            TOTAL CREDENTIALS
+================================================================================
+
+Frontend (.env):           2 variables
+Supabase Secrets:          7 secrets
+Razorpay Pricing:          Already configured (₹10, ₹79, ₹499)
+Razorpay Webhook:          1 endpoint
+
+TOTAL: 9 credentials/configurations
+
+
+================================================================================
+                            LINKS & RESOURCES
+================================================================================
+
+Supabase Dashboard:    https://supabase.com/dashboard
+Razorpay Dashboard:    https://dashboard.razorpay.com
+Lovable Dashboard:     https://lovable.dev
+
+Supabase Docs:         https://supabase.com/docs
+Razorpay Docs:         https://razorpay.com/docs
+Lovable Docs:         https://docs.lovable.dev
+
+================================================================================
+

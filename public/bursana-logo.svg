@@ -1,0 +1,38 @@
+<svg width="240" height="80" viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradientB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4B0082;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6A0DAD;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradientU" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E90FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00CED1;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradientN" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF8C00;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- B - Deep Indigo/Dark Blue -->
+  <text x="10" y="55" font-family="Arial, sans-serif" font-size="56" font-weight="bold" fill="#4B0082">B</text>
+  
+  <!-- U - Dark Blue to Teal with elongated tail -->
+  <text x="45" y="55" font-family="Arial, sans-serif" font-size="56" font-weight="bold" fill="url(#gradientU)">U</text>
+  <path d="M 50 60 L 48 70 L 46 75 L 44 78" stroke="#00CED1" stroke-width="3" fill="none" stroke-linecap="round"/>
+  
+  <!-- R - Bright Teal/Light Blue -->
+  <text x="75" y="55" font-family="Arial, sans-serif" font-size="56" font-weight="bold" fill="#00CED1">R</text>
+  
+  <!-- S - Lime Green/Yellowish-Green -->
+  <text x="105" y="55" font-family="Arial, sans-serif" font-size="56" font-weight="bold" fill="#32CD32">S</text>
+  
+  <!-- First A - Bright Yellow -->
+  <text x="135" y="55" font-family="Arial, sans-serif" font-size="56" font-weight="bold" fill="#FFD700">A</text>
+  
+  <!-- N - Orange-Yellow to Reddish-Orange -->
+  <text x="165" y="55" font-family="Arial, sans-serif" font-size="56" font-weight="bold" fill="url(#gradientN)">N</text>
+  
+  <!-- Second A - Solid Red -->
+  <text x="195" y="55" font-family="Arial, sans-serif" font-size="56" font-weight="bold" fill="#FF0000">A</text>
+</svg>

@@ -90,7 +90,14 @@ const Dashboard = () => {
       if (error) throw error;
 
       if (data.error) {
-        toast.error(data.error);
+        if (data.error.includes('Lovable AI credits exhausted')) {
+          toast.error(data.error, {
+            description: "Go to Settings → Workspace → Usage to add credits",
+            duration: 8000,
+          });
+        } else {
+          toast.error(data.error);
+        }
         return;
       }
 

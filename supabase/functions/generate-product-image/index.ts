@@ -101,7 +101,7 @@ serve(async (req) => {
       
       if (aiResponse.status === 402) {
         return new Response(
-          JSON.stringify({ error: 'AI service payment required. Please contact support.' }),
+          JSON.stringify({ error: 'Lovable AI credits exhausted. Please add credits to your workspace to continue generating images.' }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
